@@ -1,0 +1,170 @@
+@startuml DiagramaClasesBiblioteca
+' EA1 - Diagrama de clases: Sistema de biblioteca
+' Programación Orientada a Objetos II - IU Digital de Antioquia
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 70
+skinparam ranksep 80
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam class {
+  BackgroundColor #FDFDFD
+  BorderColor #444444
+  ArrowColor #333333
+}
+skinparam note {
+  BackgroundColor #FFFBE6
+  BorderColor #B8A000
+}
+
+title Sistema de Biblioteca - Diagrama de Clases UML
+
+' ======================= Servicio y persistencia =======================
+class Biblioteca {
+  - nombre: String
+  + Biblioteca(nombre: String, repositorio: RepositorioLibros)
+  + buscarLibro(titulo: String): Libro
+  + registrarPrestamo(usuario: Usuario, libro: Libro): Prestamo
+  + registrarDevolucion(prestamo: Prestamo): void
+}
+
+interface RepositorioLibros {
+  + guardar(libro: Libro): void
+  + buscarPorTitulo(titulo: String): Libro
+  + listarDisponibles(): List<Libro>
+}
+
+class RepositorioLibrosMemoria {
+  + guardar(libro: Libro): void
+  + buscarPorTitulo(titulo: String): Libro
+  + listarDisponibles(): List<Libro>
+}
+
+' ============================ Dominio ============================
+class Autor {
+  - id: int
+  - nombre: String
+  - nacionalidad: String
+  + Autor(id: int, nombre: String, nacionalidad: String)
+  + getNombre(): String
+  + getNacionalidad(): String
+  + agregarLibro(libro: Libro): void
+  + getLibros(): List<Libro>
+}
+
+abstract class Libro {
+  - id: int
+  - titulo: String
+  - disponible: boolean
+  + Libro(id: int, titulo: String, autor: Autor)
+  + getTitulo(): String
+  + getAutor(): Autor
+  + estaDisponible(): boolean
+  + prestar(): void
+  + devolver(): void
+  + {abstract} obtenerFormato(): String
+}
+
+class LibroFisico {
+  - ubicacion: String
+  + getUbicacion(): String
+  + obtenerFormato(): String
+}
+
+class LibroDigital {
+  - urlDescarga: String
+  + obtenerFormato(): String
+  + descargar(): String
+}
+
+interface Descargable {
+  + descargar(): String
+}
+
+class Usuario {
+  - id: int
+  - nombre: String
+  + Usuario(id: int, nombre: String)
+  + getId(): int
+  + getNombre(): String
+}
+
+class Prestamo {
+  - id: int
+  - activo: boolean
+  + Prestamo(id: int, usuario: Usuario, libro: Libro, fechaPrestamo: LocalDate)
+  + registrarDevolucion(): void
+  + registrarDevolucion(fecha: LocalDate): void
+  + calcularDiasPrestamo(): int
+  + estaActivo(): boolean
+}
+
+class PeriodoPrestamo {
+  - fechaPrestamo: LocalDate
+  - fechaDevolucion: LocalDate [0..1]
+  + PeriodoPrestamo(fechaPrestamo: LocalDate)
+  + registrarFin(fecha: LocalDate): void
+  + calcularDuracion(): int
+}
+
+' ============================ Relaciones ============================
+' Asociación dirigida (inyección por constructor -> DIP)
+Biblioteca "1" --> "1" RepositorioLibros : usa >
+
+' Realización de interfaces
+RepositorioLibros <|.. RepositorioLibrosMemoria
+Descargable <|.. LibroDigital
+
+' Agregación: el repositorio mantiene libros que existen por sí mismos
+RepositorioLibrosMemoria "1" o-- "0..*" Libro : almacena >
+
+' Dependencias (uso temporal en parámetros / creación)
+Biblioteca ..> Usuario : <<use>>
+Biblioteca ..> Prestamo : <<create>>
+
+' Agregación: un autor reúne los libros que ha escrito
+Autor "1" o-- "0..*" Libro : escribe >
+
+' Herencia
+Libro <|-- LibroFisico
+Libro <|-- LibroDigital
+
+' Asociaciones
+Usuario "1" -- "0..*" Prestamo : solicita >
+Prestamo "0..*" --> "1" Libro : presta >
+
+' Composición: el periodo no existe sin el préstamo
+Prestamo "1" *-- "1" PeriodoPrestamo : contiene >
+
+' ============================== Notas ==============================
+note right of Prestamo
+  **Sobrecarga:**
+  registrarDevolucion()
+  registrarDevolucion(fecha)
+  calcularDiasPrestamo() delega en
+  PeriodoPrestamo.calcularDuracion()
+end note
+
+note bottom of Libro
+  **Abstracción y polimorfismo:**
+  obtenerFormato() es abstracto y se
+  sobrescribe en LibroFisico y LibroDigital.
+  prestar() valida disponibilidad;
+  devolver() actualiza el estado.
+end note
+
+note top of RepositorioLibros
+  **DIP / OCP:** Biblioteca depende de la
+  abstracción; se puede cambiar a una
+  implementación con base de datos sin
+  modificar Biblioteca.
+end note
+
+note right of Descargable
+  **ISP:** solo los libros digitales
+  implementan descargar().
+end note
+
+@enduml
